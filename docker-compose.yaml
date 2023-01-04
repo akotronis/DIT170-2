@@ -1,0 +1,160 @@
+version: "3.8"
+
+volumes:
+  mongodb-data:
+  neo4j-data:
+  mariadb-data:
+
+services:
+  #######################################################################
+  ################################ FLASK ################################
+  #######################################################################
+  web-srv:
+    build: .
+    image: web-image
+    container_name: web-container
+    restart: always
+    command: python -u src/run.py
+    ports:
+      - 5000:5000
+    volumes:
+      - ./:/app
+    env_file:
+      - .env
+    environment:
+      # Mongo
+      - ME_CONFIG_MONGODB_URL=mongodb://${DB_USERNAME}:${DB_PASSWORD}@mongodb-srv:27017/
+      # Neo4j
+      - NEO4J_AUTH=${NEO4J_USERNAME}/${NEO4J_PASSWORD}
+      - NEO4J_URL=bolt://neo4j-srv:7687
+      # Kafka
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka-srv:29092
+      # MySQL
+      - MYSQL_USER=${DB_USERNAME}
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+      - MYSQL_DATABASE=flaskdb
+      - MYSQL_HOST=mariadb-srv
+    depends_on:
+      - neo4j-srv
+      - mongo-express-srv
+      - kafka-ui-srv
+      - phpmyadmin-srv
+
+  #######################################################################
+  ###################### MONGODB / MONGO EXPRESS UI #####################
+  #######################################################################
+  mongodb-srv:
+    image: mongo:latest
+    container_name: mongodb-container
+    restart: always
+    volumes:
+      - mongodb-data:/data/db
+    env_file:
+      - .env
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${DB_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${DB_PASSWORD}
+
+  mongo-express-srv:
+    image: mongo-express
+    container_name: mongo-express-container
+    restart: always
+    ports:
+      - 8081:8081
+    env_file:
+      - .env
+    environment:
+      - ME_CONFIG_MONGODB_URL=mongodb://${DB_USERNAME}:${DB_PASSWORD}@mongodb-srv:27017/
+    depends_on:
+      - mongodb-srv
+
+  #######################################################################
+  ################################ NEO4J ################################
+  #######################################################################
+  # https://thibaut-deveraux.medium.com/how-to-install-neo4j-with-docker-compose-36e3ba939af0
+  # https://neo4j.com/docs/ops-manager/current/docker/compose/
+  neo4j-srv:
+    image: neo4j:latest
+    container_name: neo4jdb-container
+    restart: always
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      # Docker Volume Mount
+      - neo4j-data:/db
+      # Bind Mount
+      # - ./neo4j-db/conf:/db/conf
+      # - ./neo4j-db/data:/db/data
+      # - ./neo4j-db/import:/db/import
+      # - ./neo4j-db/logs:/db/logs
+      # - ./neo4j-db/plugins:/db/plugins
+    environment:
+      - NEO4J_AUTH=${NEO4J_USERNAME}/${NEO4J_PASSWORD}
+
+  #######################################################################
+  ########################### KAFKA / KAFKA UI ##########################
+  #######################################################################
+  # https://developer.confluent.io/quickstart/kafka-docker/
+  zookeeper-srv:
+    image: confluentinc/cp-zookeeper:7.3.0
+    container_name: zookeeper-container
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka-srv:
+    image: confluentinc/cp-kafka:7.3.0
+    container_name: kafka-container
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper-srv
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper-srv:2181"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka-srv:29092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+
+  # https://github.com/provectus/kafka-ui/blob/master/docker-compose.md
+  kafka-ui-srv:
+    image: provectuslabs/kafka-ui
+    container_name: kafka-ui-container
+    restart: always
+    ports:
+      - "8080:8080"
+    depends_on:
+      - kafka-srv
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka-srv:29092
+      - KAFKA_CLUSTERS_0_READONLY=false
+
+  #######################################################################
+  ######################## MARIADB / PHPMYADMIN UI ######################
+  #######################################################################
+  mariadb-srv:
+    image: mariadb:10.4
+    container_name: mariadb-container
+    restart: always
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_USERNAME}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: "flaskdb"
+
+  phpmyadmin-srv:
+    image: phpmyadmin/phpmyadmin
+    container_name: phpmyadmin-container
+    restart: always
+    ports:
+      - "8082:80"
+    depends_on:
+      - mariadb-srv
+    environment:
+      - PMA_HOST=mariadb-srv
