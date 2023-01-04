@@ -35,7 +35,7 @@ The mechanism of the pipeline is illustrated below (figure by the teacher John V
 - Launch a terminal in root level and RUN `docker-compose up`.
 - When all services are up and running,
   - Launch a new terminal and RUN `docker exec -it web-container bash` to run commands on the **Flask** container named `web-container`.
-  - Once you are in the container, RUN `cd src && python -m flaskapp.initialize --categories-num=8` (if `--categories-num=8` is omitted, will default to 8). This will create the _products_ database and 8 collections of products from the `products.json` file, as well as dummy users for Neo4j as described above.
+  - Once you are in the container, RUN `cd src && python -m flaskapp.initialize --categories-num=8` (if `--categories-num=8` is omitted, will default to 8. 2-10 is recommended). This will create the _products_ database and 8 collections of products from the `products.json` file, as well as dummy users for Neo4j as described above.
 - **Mongo Express UI** will be listening on `http://localhost:8081`
 - **Neo4j** will be listening on `http://localhost:7474/browser` (credentials as in `.env` file `NEO4j_...`)
 - **Kafka UI** will be listening on `http://localhost:8080`
