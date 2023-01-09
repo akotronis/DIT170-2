@@ -17,6 +17,7 @@ services:
     command: python -u src/run.py
     ports:
       - 5000:5000
+    # Mount developer folder to container to automatically reflect code changes
     volumes:
       - ./:/app
     env_file:
@@ -83,7 +84,7 @@ services:
     volumes:
       # Docker Volume Mount
       - neo4j-data:/db
-      # Bind Mount
+      # Bind Mount (Dirs will be created if not present)
       # - ./neo4j-db/conf:/db/conf
       # - ./neo4j-db/data:/db/data
       # - ./neo4j-db/import:/db/import

@@ -1,8 +1,9 @@
 import string
 import mysql
+from typing import Any
 
 
-def printm(message=None, title='', width=80):
+def printm(message: Any=None, title: str='', width: int=80) -> str:
     output = []
     title = title if not title else f" {title} ".center(width, '=') + '\n'
     output.append(f"{width*'='}\n{title}{width*'='}")

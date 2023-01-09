@@ -149,7 +149,7 @@ def populate_products_db(client, categories_num, keep_attrs=('title', 'descripti
 
     # filter `products_by_category`
     categories_num = min(categories_num, len(products_by_category))
-    selected_categories = random.sample(products_by_category.keys(), categories_num)
+    selected_categories = random.sample(list(products_by_category.keys()), categories_num)
     products_by_category = {k:v for k,v in products_by_category.items() if k in selected_categories}
 
     # Populate Mongodb category collections

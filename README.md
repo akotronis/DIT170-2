@@ -44,3 +44,10 @@ The mechanism of the pipeline is illustrated below (figure by the teacher John V
   - Through `http://localhost:5000/collection/<collection-name>` the contents of the MongoDB products collection _collection-name_ will be sent to Kafka
   - Through `http://localhost:5000/user/<user-id>` the Neo4j user with id _user-id_ along with the users connected with it will be sent to Kafka
   - Through `http://localhost:5000/collection/<collection-name>/user/<user-id>` the contents of the latest offset of kafka topic with name _collection-name_ will be read along with the user data of the kafka topic with name _users_ and of the latest offset where the user with this id is found and the matched infomation will populate the corresponding tables on MariaDB database (tables `users`, `categories`, `products`, `transactions`)
+
+# Stop the application
+
+On the terminal where `docker-compose up` was run,
+
+- Hit `Ctrl-C` to stop the app and
+- RUN `docker-compose down -v` to also remove the app docker volumes.

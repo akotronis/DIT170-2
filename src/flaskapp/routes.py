@@ -1,6 +1,6 @@
 from flask import Flask
-from flaskapp.producers import mongo_producer, neo4j_producer
-from flaskapp.consumers import neo4j_mongo_consumer
+from flaskapp.producer import mongo_producer, neo4j_producer
+from flaskapp.consumer import neo4j_mongo_consumer
 
 
 app = Flask(__name__)
