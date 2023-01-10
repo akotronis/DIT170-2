@@ -63,7 +63,7 @@ def insert_user_data(cnx: mysql.connector.connection_cext.CMySQLConnection, user
         cnx.commit()
     except mysql.connector.IntegrityError as err:
         cnx.rollback()
-        printm(title=f'Users | Error: {err}', width=100)
+        printm(title=f'MySQL: Users | Error: {err}', width=100)
     finally:
         cursor.close()
 
@@ -78,7 +78,7 @@ def insert_category_data(cnx: mysql.connector.connection_cext.CMySQLConnection, 
         cnx.commit()
     except mysql.connector.IntegrityError as err:
         cnx.rollback()
-        printm(title=f'Categories | Error: {err}', width=100)
+        printm(title=f'MySQL: Categories | Error: {err}', width=100)
     finally:
         cursor.execute(query2, (category, ))
         category_id = cursor.fetchone()[0]
@@ -96,7 +96,7 @@ def insert_product_data(cnx: mysql.connector.connection_cext.CMySQLConnection, p
         cnx.commit()
     except mysql.connector.IntegrityError as err:
         cnx.rollback()
-        printm(title=f'Products | Error: {err}', width=100)
+        printm(title=f'MySQL: Products | Error: {err}', width=100)
     finally:
         cursor.close()
 
@@ -111,7 +111,7 @@ def insert_transaction_data(cnx: mysql.connector.connection_cext.CMySQLConnectio
         cnx.commit()
     except mysql.connector.IntegrityError as err:
         cnx.rollback()
-        printm(title=f'Transactions | Error: {err}', width=100)
+        printm(title=f'MySQL: Transactions | Error: {err}', width=100)
     finally:
         cursor.close()
 
@@ -120,12 +120,12 @@ def create_mysql_table(cnx: mysql.connector.connection_cext.CMySQLConnection, ta
     '''Create a MySQL table'''
     cursor = cnx.cursor()
     try:
-        printm(title=f"Creating table: `{table_name}`")
+        print(f"MySQL: Creating table: `{table_name}`")
         cursor.execute(query)
     except mysql.connector.Error as e:
-        printm(e, 'Mysql Error')
+        printm(e, 'MySQL: Error')
     else:
-        printm(title=f'Mysql: Table `{table_name}` in place')
+        print(f'MySQL: Table `{table_name}` in place')
     finally:
         cursor.close()
 
@@ -134,9 +134,9 @@ def drop_mysql_table(cnx: mysql.connector.connection_cext.CMySQLConnection, tabl
     '''Drop a MySQL table if t exists'''
     cursor = cnx.cursor()
     try:
-        printm(title=f"Dropping table: `{table_name}`")
+        print(f"MySQL: Dropping table: `{table_name}`")
         cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
     except mysql.connector.Error as e:
-        printm(e, 'Mysql Error')
+        printm(e, 'MySQL: Error')
     finally:
         cursor.close()

@@ -151,12 +151,13 @@ def populate_products_db(client, categories_num, keep_attrs=('title', 'descripti
 
     # Drop existing collections if any
     for collection in db.list_collection_names():
+        print(f"MongoDB: Dropping collection: `{collection}`")
         db[collection].drop()
 
     # Populate Mongodb category collections
     product_obj_ids = []
     for category, products_per_category in products_by_category.items():
-        db[category].delete_many({})
+        print(f"MongoDB: Creating collection: `{category}`")
         inserted_ids = db[category].insert_many(products_per_category).inserted_ids
         product_obj_ids.extend(inserted_ids)
 
@@ -168,6 +169,9 @@ def populate_products_db(client, categories_num, keep_attrs=('title', 'descripti
 
 def populate_users_db(client, product_ids, users_num=10):
     '''Create neo4j user nodes with name and product properties and friendship relationships'''
+     # Delete all nodes and relationships
+    client.query("MATCH (u) DETACH DELETE u")
+
     # Create fake users with 'name' and 'products' properties
     fake = Faker()
     product_upper_bound = len(product_ids) // users_num
@@ -175,9 +179,6 @@ def populate_users_db(client, product_ids, users_num=10):
             fake.name(),
             random.sample(product_ids, random.randint(1, product_upper_bound))
         ) for i in range(users_num)]
-
-    # Delete all nodes and relationships
-    client.query("MATCH (u) DETACH DELETE u")
 
     query = []
     # User nodes

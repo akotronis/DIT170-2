@@ -60,7 +60,6 @@ def neo4j_mongo_consumer(collection, user_id):
         # Search for user products in given collection
         user_products_in_collection = set(user_data['products']).intersection(all_collection_products.keys())
         for product_id in user_products_in_collection:
-            print(product_id)
             product_data = {'id':product_id, 'category_id':category_id, **all_collection_products[product_id]}
             insert_product_data(cnx, product_data)
             transaction_data = {'user_id':user_data['id'], 'product_id':product_id, 'timestamp':user_data['timestamp']}
