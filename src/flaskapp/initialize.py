@@ -8,7 +8,7 @@ import mysql.connector
 from pymongo import MongoClient
 
 from flaskapp.neo import Neo4jConnection
-from flaskapp import printm, node_from_name, print_friendships
+from flaskapp import printm, node_from_name, print_friendships, create_mysql_table, drop_mysql_table
 
 
 def get_mysql_client():
@@ -23,7 +23,7 @@ def get_mysql_client():
     return client
 
 
-def initialize_mysql(client):
+def initialize_mysql(cnx):
     '''Create MySQL database tables if they don't exist'''
     # Define queries for table creation
     users = '''
@@ -64,23 +64,18 @@ def initialize_mysql(client):
         );
     '''
 
-    # Create tables if not exist
-    TABLES = {'users':users, 'categories':categories, 'products':products, 'transactions':transactions}
-    cursor = client.cursor()
-    for table in TABLES:
-        query = TABLES[table]
-        try:
-            printm(title=f"Creating table: `{table}`")
-            cursor.execute(query)
-        except mysql.connector.Error as e:
-            printm(e, 'Mysql Error')
-        else:
-            printm(title=f'Mysql: Table `{table}` in place')
-            cursor.execute(f"DELETE FROM {table}")
+    TABLES = {'transactions':transactions, 'products':products, 'categories':categories, 'users':users}
     
-    # Close cursor and connection
-    cursor.close()
-    client.close()
+    # Drop tables if they exist
+    for table_name in TABLES:
+        drop_mysql_table(cnx, table_name)
+
+    # Create tables if not exist in backward ordr to handle foreign key dependencies
+    for table_name, table_query in list(TABLES.items())[::-1]:
+        create_mysql_table(cnx, table_name, table_query)
+    
+    # Close connection
+    cnx.close()
 
 
 def get_neo4j_client():
@@ -152,8 +147,13 @@ def populate_products_db(client, categories_num, keep_attrs=('title', 'descripti
     selected_categories = random.sample(list(products_by_category.keys()), categories_num)
     products_by_category = {k:v for k,v in products_by_category.items() if k in selected_categories}
 
-    # Populate Mongodb category collections
     db = client['products']
+
+    # Drop existing collections if any
+    for collection in db.list_collection_names():
+        db[collection].drop()
+
+    # Populate Mongodb category collections
     product_obj_ids = []
     for category, products_per_category in products_by_category.items():
         db[category].delete_many({})
@@ -171,12 +171,10 @@ def populate_users_db(client, product_ids, users_num=10):
     # Create fake users with 'name' and 'products' properties
     fake = Faker()
     product_upper_bound = len(product_ids) // users_num
-    names_with_products = [
-        (
+    names_with_products = [(
             fake.name(),
             random.sample(product_ids, random.randint(1, product_upper_bound))
-        ) for i in range(users_num)
-    ]
+        ) for i in range(users_num)]
 
     # Delete all nodes and relationships
     client.query("MATCH (u) DETACH DELETE u")
@@ -196,7 +194,7 @@ def populate_users_db(client, product_ids, users_num=10):
         friend_nodes = random.sample(other_nodes, random.randint(1, len(other_nodes)))
         query.extend([f"({user_node})-[:FRIEND]->({friend_node})" for friend_node in friend_nodes])
         friendships[user_node] = friend_nodes
-    print_friendships(friendships)
+    # print_friendships(friendships)
 
     # Create and execute query
     query = f"CREATE {', '.join(query)}"
@@ -205,7 +203,7 @@ def populate_users_db(client, product_ids, users_num=10):
     client.close()
 
 
-def initialize_kafka(categories):
+def initialize_kafka(categories) -> None:
     uri = get_kafka_uri()
 
     # Create admin client to create and delete topics

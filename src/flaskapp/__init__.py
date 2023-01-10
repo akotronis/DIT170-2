@@ -1,5 +1,6 @@
+from neo4j import graph
 import string
-import mysql
+import mysql.connector
 from typing import Any
 
 
@@ -15,7 +16,7 @@ def printm(message: Any=None, title: str='', width: int=80) -> str:
     return output
 
 
-def node_from_name(name):
+def node_from_name(name: str) -> str:
     '''Remove spaces and punctuation from users names to use as node labels'''
     node = ''.join([char for char in ''.join(name.split()) if char not in string.punctuation])
     return node
@@ -28,13 +29,13 @@ def kafka_cluster_metadata(client):
     return metadata
 
 
-def doc_oid_to_str(doc):
+def doc_oid_to_str(doc: dict) -> dict:
     '''Convert object id to string'''
     doc['_id'] = str(doc['_id'])
     return doc
 
 
-def print_friendships(friendships):
+def print_friendships(friendships: dict) -> None:
     '''For each user, print user and friends, were friend is any node that is connected with user (not directed relationship)'''
     for user_node in friendships:
         print(f"User: {user_node}")
@@ -43,7 +44,7 @@ def print_friendships(friendships):
             print(f"  {str(i).zfill(2)}: {friend}")
 
 
-def user_node_to_dict(user_node):
+def user_node_to_dict(user_node: graph.Node) -> dict:
     '''Extract data from neo4j quet results'''
     user_dict = {
         'id': int(user_node.element_id.split(':')[-1]),
@@ -53,7 +54,7 @@ def user_node_to_dict(user_node):
     return user_dict
 
 
-def insert_user_data(cnx, user_data):
+def insert_user_data(cnx: mysql.connector.connection_cext.CMySQLConnection, user_data: dict) -> None:
     '''Insert user data to MySQL database table'''
     cursor = cnx.cursor()
     query = '''INSERT INTO users (id, name) VALUES (%(id)s, %(name)s)'''
@@ -67,7 +68,7 @@ def insert_user_data(cnx, user_data):
         cursor.close()
 
 
-def insert_category_data(cnx, category):
+def insert_category_data(cnx: mysql.connector.connection_cext.CMySQLConnection, category: str) -> int:
     '''Insert category data to MySQL database table'''
     cursor = cnx.cursor()
     query1 = '''INSERT INTO categories (title) VALUES (%s)'''
@@ -85,7 +86,7 @@ def insert_category_data(cnx, category):
     return category_id
         
 
-def insert_product_data(cnx, product_data):
+def insert_product_data(cnx: mysql.connector.connection_cext.CMySQLConnection, product_data: dict) -> None:
     '''Insert product data to MySQL database table'''
     cursor = cnx.cursor()
     query = '''INSERT INTO products (id, title, description, category_id)
@@ -100,7 +101,7 @@ def insert_product_data(cnx, product_data):
         cursor.close()
 
 
-def insert_transaction_data(cnx, transaction_data):
+def insert_transaction_data(cnx: mysql.connector.connection_cext.CMySQLConnection, transaction_data: dict) -> None:
     '''Insert transaction data to MySQL database table'''
     cursor = cnx.cursor()
     query = '''INSERT INTO transactions (user_id, product_id, timestamp)
@@ -111,5 +112,31 @@ def insert_transaction_data(cnx, transaction_data):
     except mysql.connector.IntegrityError as err:
         cnx.rollback()
         printm(title=f'Transactions | Error: {err}', width=100)
+    finally:
+        cursor.close()
+
+
+def create_mysql_table(cnx: mysql.connector.connection_cext.CMySQLConnection, table_name: str, query: str) -> None:
+    '''Create a MySQL table'''
+    cursor = cnx.cursor()
+    try:
+        printm(title=f"Creating table: `{table_name}`")
+        cursor.execute(query)
+    except mysql.connector.Error as e:
+        printm(e, 'Mysql Error')
+    else:
+        printm(title=f'Mysql: Table `{table_name}` in place')
+    finally:
+        cursor.close()
+
+
+def drop_mysql_table(cnx: mysql.connector.connection_cext.CMySQLConnection, table_name: str) -> None:
+    '''Drop a MySQL table if t exists'''
+    cursor = cnx.cursor()
+    try:
+        printm(title=f"Dropping table: `{table_name}`")
+        cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
+    except mysql.connector.Error as e:
+        printm(e, 'Mysql Error')
     finally:
         cursor.close()
