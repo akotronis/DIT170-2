@@ -153,6 +153,7 @@ def populate_users_db(neo4j_connector, product_ids, users_num=10):
 
 
 def initialize_kafka(categories) -> None:
+    '''Create topics proramatically during initialization phase. Not used'''
     uri = get_kafka_uri()
 
     # Create admin client to create and delete topics

@@ -4,6 +4,7 @@ from typing import Any
 
 
 def printm(message: Any=None, title: str='', width: int=80) -> str:
+    '''Print message prettier adding lines and title to make it clear within other outputs'''
     output = []
     title = title if not title else f" {title} ".center(width, '=') + '\n'
     output.append(f"{width*'='}\n{title}{width*'='}")
@@ -47,6 +48,7 @@ def user_node_to_dict(user_node: graph.Node) -> dict:
 
 
 def kafka_cluster_metadata(client):
+    '''Get kafka client metadata'''
     future = client.cluster.request_update()
     client.poll(future=future)
     metadata = client.cluster

@@ -18,6 +18,7 @@ def connection_established(db):
 
 
 class MySQLConnector:
+    '''Class to connect to MySQL database and perform queries'''
     def __init__(self, user, password, host, database):
         self.user = user
         self.password = password
@@ -134,6 +135,7 @@ class MySQLConnector:
 
 
 class MongoDBConnector:
+    '''Class to connect to MongoDB database'''
     def __init__(self, uri):
         self.uri = uri
         self.cnx  = None
@@ -150,6 +152,7 @@ class MongoDBConnector:
 
 
 class Neo4jConnector:
+    '''Class to connect to Neo4j database and perform queries'''
     def __init__(self, uri, user, pwd):
         self.uri = uri
         self.user = user
@@ -185,7 +188,7 @@ class Neo4jConnector:
 
 
 def get_mysql_connector():
-    '''Connect to mysql as defined in docker compose file'''
+    '''Connect to mysql as defined in docker compose file env vars'''
     user, password = os.getenv('MYSQL_USER'), os.getenv('MYSQL_PASSWORD')
     host, database = os.getenv('MYSQL_HOST'), os.getenv('MYSQL_DATABASE')
     mysql_connector = MySQLConnector(user, password, host, database)
@@ -193,14 +196,14 @@ def get_mysql_connector():
 
 
 def get_mongodb_connector():
-    '''Connect to mongodb as defined in docker compose file'''
+    '''Connect to mongodb as defined in docker compose file env vars'''
     mongodb_uri = os.getenv('ME_CONFIG_MONGODB_URL')
     mongodb_connector = MongoDBConnector(mongodb_uri)
     return mongodb_connector
 
 
 def get_neo4j_connector():
-    '''Connect to neo4j as defined in docker compose file'''
+    '''Connect to neo4j as defined in docker compose file env vars'''
     uri = os.getenv('NEO4J_URL')
     username, password = os.getenv('NEO4J_AUTH').split('/')
     neo4j_connector = Neo4jConnector(uri=uri, user=username, pwd=password)
@@ -208,7 +211,7 @@ def get_neo4j_connector():
 
 
 def get_kafka_uri():
-    '''Get Kafka connection uri as defined in docker compose, or local connection uri in case we ran consumers outside docker'''
+    '''Get Kafka connection uri as defined in docker compose env vars, or local connection uri in case we ran consumers outside docker'''
     try:
         _, uri = os.getenv('KAFKA_ADVERTISED_LISTENERS').split(',')[-1].split('//')
     except:
