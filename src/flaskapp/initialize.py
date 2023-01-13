@@ -4,26 +4,63 @@ import json
 import os
 import random
 from kafka.admin import KafkaAdminClient, NewTopic
-import mysql.connector
-from pymongo import MongoClient
 
-from flaskapp.neo import Neo4jConnection
-from flaskapp import printm, node_from_name, print_friendships, create_mysql_table, drop_mysql_table
+from flaskapp import node_from_name, print_friendships
+from flaskapp.db import get_mysql_connector, get_mongodb_connector, get_neo4j_connector, get_kafka_uri
 
 
-def get_mysql_client():
-    '''Return the mysql client according to docker-compose definition of the database
-    '''
-    user, password = os.getenv('MYSQL_USER'), os.getenv('MYSQL_PASSWORD')
-    host, database = os.getenv('MYSQL_HOST'), os.getenv('MYSQL_DATABASE')
-    try:
-        client = mysql.connector.connect(user=user, password=password, database=database, host=host)
-    except Exception as e:
-        printm(e, "Failed to connect with MariaDB database:")
-    return client
+def load_products():
+    '''Load products from json file'''
+    with open('../products.json') as f:
+        products = json.load(f)['products']
+    return products
 
 
-def initialize_mysql(cnx):
+def populate_products_db(mongodb_connector, categories_num, keep_attrs=('title', 'description')):
+    '''Create mongoDB products database and category collections'''
+    ########################## Products dummy data API #########################
+    # https://dummyjson.com/products/categories                                #
+    # https://dummyjson.com/products/category/{category}?limit={per_category}  #
+    ############################################################################
+    # Load products from json file
+    products = load_products()
+
+    # Create products by category dict
+    products_by_category = {}
+    for product in products:
+        product_category = product['category']
+        updated_product = {k:product[k] for k in keep_attrs}
+        try:
+            products_by_category[product_category].append(updated_product)
+        except:
+            products_by_category[product_category] = [updated_product]
+
+    # filter `products_by_category`
+    categories_num = min(categories_num, len(products_by_category))
+    selected_categories = random.sample(list(products_by_category.keys()), categories_num)
+    products_by_category = {k:v for k,v in products_by_category.items() if k in selected_categories}
+
+    db = mongodb_connector.cnx['products']
+
+    # Drop existing collections if any
+    for collection in db.list_collection_names():
+        print(f"MongoDB: Dropping collection: `{collection}`")
+        db[collection].drop()
+
+    # Populate Mongodb category collections
+    product_obj_ids = []
+    for category, products_per_category in products_by_category.items():
+        print(f"MongoDB: Creating collection: `{category}`")
+        inserted_ids = db[category].insert_many(products_per_category).inserted_ids
+        product_obj_ids.extend(inserted_ids)
+
+    # Close connection
+    mongodb_connector.close()
+    product_ids, categories = [str(obj_id) for obj_id in product_obj_ids], list(products_by_category.keys())
+    return product_ids, categories
+
+
+def initialize_mysql(mysql_connector):
     '''Create MySQL database tables if they don't exist'''
     # Define queries for table creation
     users = '''
@@ -68,109 +105,20 @@ def initialize_mysql(cnx):
     
     # Drop tables if they exist
     for table_name in TABLES:
-        drop_mysql_table(cnx, table_name)
+        mysql_connector.drop_table(table_name)
 
     # Create tables if not exist in backward ordr to handle foreign key dependencies
     for table_name, table_query in list(TABLES.items())[::-1]:
-        create_mysql_table(cnx, table_name, table_query)
+        mysql_connector.create_table(table_name, table_query)
     
     # Close connection
-    cnx.close()
+    mysql_connector.close()
 
 
-def get_neo4j_client():
-    '''Return the neo4j client according to docker-compose definition of the database
-    '''
-    uri = os.getenv('NEO4J_URL')
-    username, password = os.getenv('NEO4J_AUTH').split('/')
-    client = Neo4jConnection(uri=uri, user=username, pwd=password)
-    return client 
-
-
-def get_mongo_client():
-    '''Return the mongodb client according to docker-compose definition of the database
-    '''
-    uri = os.getenv('ME_CONFIG_MONGODB_URL')
-    try:
-        client = MongoClient(host=uri)
-    except Exception as e:
-        printm(e, "Failed to connect with MongoDB database:")
-    return client
-
-
-def get_mongo_collections():
-    '''Get mongoDB products database collections'''
-    client = get_mongo_client()
-    db = client['products']
-    collections = db.list_collection_names()
-    client.close()
-    return collections
-
-
-def load_products():
-    '''Load products from json file'''
-    with open('../products.json') as f:
-        products = json.load(f)['products']
-    return products
-
-
-def get_kafka_uri():
-    '''Get Kafka connection uri as defined in docker compose, or local connection uri in case we ran consumers outside docker'''
-    try:
-        _, uri = os.getenv('KAFKA_ADVERTISED_LISTENERS').split(',')[-1].split('//')
-    except:
-        uri = 'localhost:9092'
-    return uri
-
-
-def populate_products_db(client, categories_num, keep_attrs=('title', 'description')):
-    '''Create mongoDB products database and category collections'''
-    ########################## Products dummy data API #########################
-    # https://dummyjson.com/products/categories                                #
-    # https://dummyjson.com/products/category/{category}?limit={per_category}  #
-    ############################################################################
-    # Load products from json file
-    products = load_products()
-
-    # Create products by category dict
-    products_by_category = {}
-    for product in products:
-        product_category = product['category']
-        updated_product = {k:product[k] for k in keep_attrs}
-        try:
-            products_by_category[product_category].append(updated_product)
-        except:
-            products_by_category[product_category] = [updated_product]
-
-    # filter `products_by_category`
-    categories_num = min(categories_num, len(products_by_category))
-    selected_categories = random.sample(list(products_by_category.keys()), categories_num)
-    products_by_category = {k:v for k,v in products_by_category.items() if k in selected_categories}
-
-    db = client['products']
-
-    # Drop existing collections if any
-    for collection in db.list_collection_names():
-        print(f"MongoDB: Dropping collection: `{collection}`")
-        db[collection].drop()
-
-    # Populate Mongodb category collections
-    product_obj_ids = []
-    for category, products_per_category in products_by_category.items():
-        print(f"MongoDB: Creating collection: `{category}`")
-        inserted_ids = db[category].insert_many(products_per_category).inserted_ids
-        product_obj_ids.extend(inserted_ids)
-
-    # Close connection
-    client.close()
-    product_ids, categories = [str(obj_id) for obj_id in product_obj_ids], list(products_by_category.keys())
-    return product_ids, categories
-
-
-def populate_users_db(client, product_ids, users_num=10):
+def populate_users_db(neo4j_connector, product_ids, users_num=10):
     '''Create neo4j user nodes with name and product properties and friendship relationships'''
      # Delete all nodes and relationships
-    client.query("MATCH (u) DETACH DELETE u")
+    neo4j_connector.query("MATCH (u) DETACH DELETE u")
 
     # Create fake users with 'name' and 'products' properties
     fake = Faker()
@@ -199,9 +147,9 @@ def populate_users_db(client, product_ids, users_num=10):
 
     # Create and execute query
     query = f"CREATE {', '.join(query)}"
-    client.query(query)
+    neo4j_connector.query(query)
     # Close connection
-    client.close()
+    neo4j_connector.close()
 
 
 def initialize_kafka(categories) -> None:
@@ -231,13 +179,20 @@ def initialize_kafka(categories) -> None:
 
 
 def main(args):
-    mongo_client = get_mongo_client()
-    product_ids, categories = populate_products_db(mongo_client, args.categories_num)
-    neo4j_client = get_neo4j_client()
-    populate_users_db(neo4j_client, product_ids)
+    # Initilize MongoDB database
+    mongodb_connector = get_mongodb_connector()
+    product_ids, categories = populate_products_db(mongodb_connector, args.categories_num)
+
+    # Initilize Neo4j database
+    neo4j_connector = get_neo4j_connector()
+    populate_users_db(neo4j_connector, product_ids)
+
+    # Initilize MySQL database
+    mysql_connector = get_mysql_connector()
+    initialize_mysql(mysql_connector)
+
+    ## Initilize Kafka
     # initialize_kafka(categories)
-    mariadb_client = get_mysql_client()
-    initialize_mysql(mariadb_client)
 
 #########################################################
 #########################################################

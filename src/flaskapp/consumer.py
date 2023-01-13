@@ -2,11 +2,11 @@ from datetime import datetime
 import json
 from kafka import KafkaConsumer, TopicPartition
 
-from flaskapp import insert_user_data, insert_category_data, insert_product_data, insert_transaction_data
-from flaskapp.initialize import get_mongo_collections, get_kafka_uri, get_mysql_client
+from flaskapp.db import get_mongodb_connector, get_mysql_connector, get_kafka_uri
 
 
-def get_latest_offset(consumer, topic, partition):
+def get_consumer_topic_latest_offset(consumer, topic, partition):
+    '''Poin to latest offset of a topic partition of a kafka consumer'''
     topic_partition = TopicPartition(topic=topic, partition=partition)
     latest_topic_partition_offset = max(consumer.end_offsets([topic_partition])[topic_partition] - 1, 0)
     consumer.seek(topic_partition, latest_topic_partition_offset)
@@ -14,8 +14,10 @@ def get_latest_offset(consumer, topic, partition):
 
 
 def neo4j_mongo_consumer(collection, user_id):
-    mongo_collections = get_mongo_collections()
-    if collection not in mongo_collections:
+    '''Consume messages from kafka users and product collection topics as defined by API endpoint and populate MySQL accordingly'''
+    mongodb_connector = get_mongodb_connector()
+    product_collections = mongodb_connector.cnx['products'].list_collection_names()
+    if collection not in product_collections:
         return {'response': 'Collection not found'}
 
     # Create Kafka Consumer for MongoDB
@@ -25,10 +27,10 @@ def neo4j_mongo_consumer(collection, user_id):
         bootstrap_servers=uri,
         value_deserializer=lambda m: json.loads(m.decode('utf-8')),
         consumer_timeout_ms=100,
-        # Can't `make auto_offset_reset='latest'` work
+        # Can't `make auto_offset_reset='latest'` work. A workaround below
     )
     # Read collection products from latest offset
-    prd_consumer = get_latest_offset(prd_consumer, collection, 0)
+    prd_consumer = get_consumer_topic_latest_offset(prd_consumer, collection, 0)
     all_collection_products = next(iter([message.value for message in prd_consumer]), {})
 
     # Create Kafka Consumer for Neo4j
@@ -50,22 +52,22 @@ def neo4j_mongo_consumer(collection, user_id):
     # Find user products that are in the given `collection` and update MySQL database tables
     if user_data:
         # Connect to MySQL database
-        cnx = get_mysql_client()
+        mysql_connector = get_mysql_connector()
         # Insert user data
         _user_data = {'id':user_data['id'], 'name':user_data['name']}
-        insert_user_data(cnx, _user_data)
+        mysql_connector.insert_user_data(_user_data)
         # Insert category data
-        category_id = insert_category_data(cnx, collection)
+        category_id = mysql_connector.insert_category_data(collection)
         products = []
         # Search for user products in given collection
         user_products_in_collection = set(user_data['products']).intersection(all_collection_products.keys())
         for product_id in user_products_in_collection:
             product_data = {'id':product_id, 'category_id':category_id, **all_collection_products[product_id]}
-            insert_product_data(cnx, product_data)
+            mysql_connector.insert_product_data(product_data)
             transaction_data = {'user_id':user_data['id'], 'product_id':product_id, 'timestamp':user_data['timestamp']}
-            insert_transaction_data(cnx, transaction_data)
+            mysql_connector.insert_transaction_data(transaction_data)
             products.append(product_data)
-        cnx.close()
+        mysql_connector.close()
         user_data['products'] = products
         return user_data
     return {'response': 'User not found'}
