@@ -48,28 +48,30 @@ def neo4j_mongo_consumer(collection, user_id):
             ts = datetime.utcfromtimestamp(message.timestamp // 1000)
             user_data = {**user_found_in_message, 'timestamp':ts.strftime('%Y-%m-%d %H:%M:%S')}
 
+    if not user_data:
+        return {'response': 'User not found'}
+        
     # Find user products that are in the given `collection` and update MySQL database tables
-    if user_data:
-        # Connect to MySQL database
-        mysql_connector = get_mysql_connector()
-        # Insert user data
-        _user_data = {'id':user_data['id'], 'name':user_data['name']}
-        mysql_connector.insert_user_data(_user_data)
-        # Insert category data
-        category_id = mysql_connector.insert_category_data(collection)
-        products = []
-        # Search for user products in given collection
-        user_products_in_collection = set(user_data['products']).intersection(all_collection_products.keys())
-        for product_id in user_products_in_collection:
-            product_data = {'id':product_id, 'category_id':category_id, **all_collection_products[product_id]}
-            mysql_connector.insert_product_data(product_data)
-            transaction_data = {'user_id':user_data['id'], 'product_id':product_id, 'timestamp':user_data['timestamp']}
-            mysql_connector.insert_transaction_data(transaction_data)
-            products.append(product_data)
-        mysql_connector.close()
-        user_data['products'] = products
-        return user_data
-    return {'response': 'User not found'}
+    # Connect to MySQL database
+    mysql_connector = get_mysql_connector()
+    # Insert user data
+    _user_data = {'id':user_data['id'], 'name':user_data['name']}
+    mysql_connector.insert_user_data(_user_data)
+    # Insert category data
+    category_id = mysql_connector.insert_category_data(collection)
+    products = []
+    # Search for user products in given collection
+    user_products_in_collection = set(user_data['products']).intersection(all_collection_products.keys())
+    for product_id in user_products_in_collection:
+        product_data = {'id':product_id, 'category_id':category_id, **all_collection_products[product_id]}
+        mysql_connector.insert_product_data(product_data)
+        transaction_data = {'user_id':user_data['id'], 'product_id':product_id, 'timestamp':user_data['timestamp']}
+        mysql_connector.insert_transaction_data(transaction_data)
+        products.append(product_data)
+    mysql_connector.close()
+    user_data['products'] = products
+    return user_data
+    
 
 
 if __name__ == '__main__':
