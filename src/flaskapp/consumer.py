@@ -2,12 +2,13 @@ from datetime import datetime
 import json
 from kafka import KafkaConsumer, TopicPartition
 
-from flaskapp.db import get_mongodb_connector, get_mysql_connector, get_kafka_uri
+from flaskapp.db import get_mysql_connector, get_kafka_uri
 
 
-def get_consumer_topic_latest_offset(consumer, topic, partition):
-    '''Poin to latest offset of a topic partition of a kafka consumer'''
+def consumer_topic_partition_latest_offset(consumer, topic, partition):
+    '''Assign a topic partition to a kafka consumer and point to latest offset'''
     topic_partition = TopicPartition(topic=topic, partition=partition)
+    consumer.assign([topic_partition])
     latest_topic_partition_offset = max(consumer.end_offsets([topic_partition])[topic_partition] - 1, 0)
     consumer.seek(topic_partition, latest_topic_partition_offset)
     return consumer
@@ -15,22 +16,20 @@ def get_consumer_topic_latest_offset(consumer, topic, partition):
 
 def neo4j_mongo_consumer(collection, user_id):
     '''Consume messages from kafka users and product collection topics as defined by API endpoint and populate MySQL accordingly'''
-    mongodb_connector = get_mongodb_connector()
-    product_collections = mongodb_connector.cnx['products'].list_collection_names()
-    if collection not in product_collections:
-        return {'response': 'Collection not found'}
 
     # Create Kafka Consumer for MongoDB
     uri = get_kafka_uri()
     prd_consumer = KafkaConsumer(
-        collection,
         bootstrap_servers=uri,
         value_deserializer=lambda m: json.loads(m.decode('utf-8')),
         consumer_timeout_ms=100,
         # Can't `make auto_offset_reset='latest'` work. A workaround below
     )
-    # Read collection products from latest offset
-    prd_consumer = get_consumer_topic_latest_offset(prd_consumer, collection, 0)
+    if collection not in prd_consumer.topics():
+        return {'response': 'Collection not found'}
+
+    # Read collection products from corresponding topic latest offset
+    prd_consumer = consumer_topic_partition_latest_offset(prd_consumer, collection, 0)
     all_collection_products = next(iter([message.value for message in prd_consumer]), {})
 
     # Create Kafka Consumer for Neo4j
