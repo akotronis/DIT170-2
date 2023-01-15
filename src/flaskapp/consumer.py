@@ -85,17 +85,4 @@ def update_mysql_tables(collection, all_collection_products, user_data):
 
 
 if __name__ == '__main__':
-    # neo4j_mongo_consumer('automotive', 1)
-    # neo4j_mongo_consumer('fragrances', 1)
-    # neo4j_mongo_consumer('furniture', 1)
-    # neo4j_mongo_consumer('groceries', 1)
-    # neo4j_mongo_consumer('home-decoration', 6)
-    # neo4j_mongo_consumer('sunglasses', 6)
-    # neo4j_mongo_consumer('laptops', 1)
-    # neo4j_mongo_consumer('lighting', 1)
-    # neo4j_mongo_consumer('mens-shirts', 1)
-    # neo4j_mongo_consumer('mens-shoes', 1)
-    # neo4j_mongo_consumer('mens-watches', 1)
-    neo4j_mongo_consumer('motorcycle', 21)
-    # neo4j_mongo_consumer('smartphones', 1)
-    # neo4j_mongo_consumer('tops', 2)
+    pass
