@@ -14,9 +14,8 @@ def consumer_topic_partition_latest_offset(consumer, topic, partition):
     return consumer
 
 
-def neo4j_mongo_consumer(collection, user_id):
-    '''Consume messages from kafka users and product collection topics as defined by API endpoint and populate MySQL accordingly'''
-
+def mongo_consumer(collection):
+    '''Consume messages from kafka product collection topic as defined by API endpoint. Data are read from latest offset'''
     # Create Kafka Consumer for MongoDB
     uri = get_kafka_uri()
     prd_consumer = KafkaConsumer(
@@ -25,15 +24,23 @@ def neo4j_mongo_consumer(collection, user_id):
         consumer_timeout_ms=100,
         # Can't `make auto_offset_reset='latest'` work. A workaround below
     )
+
+    # If topic is not present, i.e. corresponding message has not been produced, return None
     if collection not in prd_consumer.topics():
-        return {'response': 'Collection not found'}
+        prd_consumer.close()
+        return None
 
     # Read collection products from corresponding topic latest offset
     prd_consumer = consumer_topic_partition_latest_offset(prd_consumer, collection, 0)
     all_collection_products = next(iter([message.value for message in prd_consumer]), {})
     prd_consumer.close()
+    return all_collection_products
+    
 
+def neo4j_consumer(user_id):
+    '''Consume messages from kafka users topic as defined by API endpoint. Data are read from latest offset that the user is found.'''
     # Create Kafka Consumer for Neo4j
+    uri = get_kafka_uri()
     usr_consumer = KafkaConsumer(
         'users',
         bootstrap_servers=uri,
@@ -49,10 +56,11 @@ def neo4j_mongo_consumer(collection, user_id):
             ts = datetime.utcfromtimestamp(message.timestamp // 1000)
             user_data = {**user_found_in_message, 'timestamp':ts.strftime('%Y-%m-%d %H:%M:%S')}
     usr_consumer.close()
+    return user_data
 
-    if not user_data:
-        return {'response': 'User not found'}
-        
+
+def update_mysql_tables(collection, all_collection_products, user_data):
+    '''Populate MySQL databases with consumed users and products data'''
     # Find user products that are in the given `collection` and update MySQL database tables
     # Connect to MySQL database
     mysql_connector = get_mysql_connector()
