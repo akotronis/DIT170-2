@@ -31,6 +31,7 @@ def neo4j_mongo_consumer(collection, user_id):
     # Read collection products from corresponding topic latest offset
     prd_consumer = consumer_topic_partition_latest_offset(prd_consumer, collection, 0)
     all_collection_products = next(iter([message.value for message in prd_consumer]), {})
+    prd_consumer.close()
 
     # Create Kafka Consumer for Neo4j
     usr_consumer = KafkaConsumer(
@@ -47,6 +48,7 @@ def neo4j_mongo_consumer(collection, user_id):
         if user_found_in_message is not None:
             ts = datetime.utcfromtimestamp(message.timestamp // 1000)
             user_data = {**user_found_in_message, 'timestamp':ts.strftime('%Y-%m-%d %H:%M:%S')}
+    usr_consumer.close()
 
     if not user_data:
         return {'response': 'User not found'}
