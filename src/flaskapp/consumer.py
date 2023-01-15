@@ -2,16 +2,8 @@ from datetime import datetime
 import json
 from kafka import KafkaConsumer, TopicPartition
 
+from flaskapp import printm
 from flaskapp.db import get_mysql_connector, get_kafka_uri
-
-
-def consumer_topic_partition_latest_offset(consumer, topic, partition):
-    '''Assign a topic partition to a kafka consumer and point to latest offset'''
-    topic_partition = TopicPartition(topic=topic, partition=partition)
-    consumer.assign([topic_partition])
-    latest_topic_partition_offset = max(consumer.end_offsets([topic_partition])[topic_partition] - 1, 0)
-    consumer.seek(topic_partition, latest_topic_partition_offset)
-    return consumer
 
 
 def mongo_consumer(collection):
@@ -31,7 +23,10 @@ def mongo_consumer(collection):
         return None
 
     # Read collection products from corresponding topic latest offset
-    prd_consumer = consumer_topic_partition_latest_offset(prd_consumer, collection, 0)
+    topic_partition = TopicPartition(topic=collection, partition=0)
+    prd_consumer.assign([topic_partition])
+    latest_topic_partition_offset = max(prd_consumer.end_offsets([topic_partition])[topic_partition] - 1, 0)
+    prd_consumer.seek(topic_partition, latest_topic_partition_offset)
     all_collection_products = next(iter([message.value for message in prd_consumer]), {})
     prd_consumer.close()
     return all_collection_products
@@ -46,15 +41,21 @@ def neo4j_consumer(user_id):
         bootstrap_servers=uri,
         value_deserializer=lambda m: json.loads(m.decode('utf-8')),
         consumer_timeout_ms=100,
-        auto_offset_reset='earliest'
     )
+
     # Read user data from the latest offset that the `user_id` is found
+    topic_partition = TopicPartition(topic='users', partition=0)
+    end_offset = usr_consumer.end_offsets([topic_partition])[topic_partition]
     user_data = None
-    for message in usr_consumer:
-        user_found_in_message = next(iter([user for user in message.value if user['id'] == user_id]), None)
+    for offset in list(range(end_offset))[::-1]:
+        usr_consumer.seek(topic_partition, offset)
+        for message in usr_consumer:
+            user_found_in_message = next(iter([user for user in message.value if user['id'] == user_id]), None)
+            break
         if user_found_in_message is not None:
             ts = datetime.utcfromtimestamp(message.timestamp // 1000)
             user_data = {**user_found_in_message, 'timestamp':ts.strftime('%Y-%m-%d %H:%M:%S')}
+            break
     usr_consumer.close()
     return user_data
 
@@ -85,4 +86,5 @@ def update_mysql_tables(collection, all_collection_products, user_data):
 
 
 if __name__ == '__main__':
-    pass
+    neo4j_consumer(11)
+    # mongo_consumer('fragrances')
