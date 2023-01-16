@@ -49,9 +49,8 @@ def neo4j_consumer(user_id):
     user_data = None
     for offset in list(range(end_offset))[::-1]:
         usr_consumer.seek(topic_partition, offset)
-        for message in usr_consumer:
-            user_found_in_message = next(iter([user for user in message.value if user['id'] == user_id]), None)
-            break
+        message = next(usr_consumer)
+        user_found_in_message = next(iter([user for user in message.value if user['id'] == user_id]), None)
         if user_found_in_message is not None:
             ts = datetime.utcfromtimestamp(message.timestamp // 1000)
             user_data = {**user_found_in_message, 'timestamp':ts.strftime('%Y-%m-%d %H:%M:%S')}
@@ -86,5 +85,5 @@ def update_mysql_tables(collection, all_collection_products, user_data):
 
 
 if __name__ == '__main__':
-    neo4j_consumer(11)
+    neo4j_consumer(10)
     # mongo_consumer('fragrances')
