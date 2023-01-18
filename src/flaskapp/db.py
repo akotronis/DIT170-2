@@ -84,7 +84,7 @@ class MySQLConnector:
 
     @connection_established('MySQL')
     def insert_category_data(self, category: str) -> int:
-        '''Insert category data to MySQL database table'''
+        '''Insert category data to MySQL database table and return inserted (or existing) corresponding category id'''
         cursor = self.cnx.cursor()
         query1 = '''INSERT INTO categories (title) VALUES (%s)'''
         query2 = '''SELECT id FROM categories WHERE title=%s'''
