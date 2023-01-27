@@ -33,9 +33,9 @@ The mechanism of the pipeline is illustrated below (figure by the teacher John V
   - `NEO4J_USERNAME=neo4j`
   - `NEO4J_PASSWORD=password`
 - Launch a terminal in root level and RUN `docker-compose up`.
-- When all services are up and running,
-  - Launch a new terminal and RUN `docker exec -it web-container bash` to run commands on the **Flask** container named `web-container`.
-  - Once you are in the container, RUN `cd src && python -m flaskapp.initialize --categories-num=8` (if `--categories-num=8` is omitted, will default to 8. 2-10 is recommended). This will create the _products_ database and 8 collections of products from the `products.json` file, as well as dummy users for Neo4j as described above.
+
+## Services
+
 - **Mongo Express UI** will be listening on `http://localhost:8081`
 - **Neo4j** will be listening on `http://localhost:7474/browser` (credentials as in `.env` file `NEO4j_...`)
 - **Kafka UI** will be listening on `http://localhost:8080`
@@ -44,6 +44,24 @@ The mechanism of the pipeline is illustrated below (figure by the teacher John V
   - Through `http://localhost:5000/collection/<collection-name>` the contents of the MongoDB products collection _collection-name_ will be sent to Kafka
   - Through `http://localhost:5000/user/<user-id>` the Neo4j user with id _user-id_ along with the users connected with it will be sent to Kafka
   - Through `http://localhost:5000/collection/<collection-name>/user/<user-id>` the contents of the latest offset of kafka topic with name _collection-name_ will be read along with the user data of the kafka topic with name _users_ and of the latest offset where the user with this id is found and the matched infomation will populate the corresponding tables on MariaDB database (tables `users`, `categories`, `products`, `transactions`)
+
+# Initialization and Tests
+
+## Initialization
+
+When all services are up and running,
+
+- Launch a new terminal and RUN `docker exec -it web-container bash` to run commands on the **Flask** container named `web-container`.
+- Once you are in the container, RUN `cd src && python -m flaskapp.initialize --categories-num=8` (if `--categories-num=8` is omitted, will default to 8. 2-10 is recommended). This will create the _products_ database and 8 collections of products from the `products.json` file, as well as dummy users for Neo4j as described above.
+
+## Tests
+
+- Produce category products data to **Kafka** requesting `http://localhost:5000/collection/<collection-name>` for various `collection-name` values (see generated data on **MongoDB** database using **Mongo Express UI**)
+- Produce users data to **Kafka** requesting `http://localhost:5000/user/<user-id>` for various `user-id` values (see generated data on **Neo4J** database)
+- Consume category products/users data from **Kafka** requesting `http://localhost:5000/collection/<collection-name>/user/<user-id>` for various `user-id, collection-name` values (see **Kafka** topics using **Kafka UI**)
+- Check generated tables/entries on **MariaDB** database using **phpMyAdmin**.
+
+To test with fresh data, delete Kafka topics through **Kafka UI** and run again the initialization step(s).
 
 # Stop the application
 
