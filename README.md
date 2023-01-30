@@ -41,9 +41,12 @@ The mechanism of the pipeline is illustrated below (figure by the teacher John V
 - **Kafka UI** will be listening on `http://localhost:8080`
 - **phpMyAdmin** will be listening on `http://localhost:8082` (credentials as in `.env` file `DB_...`)
 - **Flask** app will be available on `http://localhost:5000`
+
   - Through `http://localhost:5000/collection/<collection-name>` the contents of the MongoDB products collection _collection-name_ will be sent to Kafka
   - Through `http://localhost:5000/user/<user-id>` the Neo4j user with id _user-id_ along with the users connected with it will be sent to Kafka
-  - Through `http://localhost:5000/collection/<collection-name>/user/<user-id>` the contents of the latest offset of kafka topic with name _collection-name_ will be read along with the user data of the kafka topic with name _users_ and of the latest offset where the user with this id is found and the matched infomation will populate the corresponding tables on MariaDB database (tables `users`, `categories`, `products`, `transactions`)
+  - Through `http://localhost:5000/collection/<collection-name>/user/<user-id>` the contents of the latest offset of kafka topic with name _collection-name_ will be read along with the user data of the kafka topic with name _users_ and of the latest offset where the user with this id is found and the matched infomation will populate the corresponding tables on MariaDB database (tables `users`, `categories`, `products`, `transactions`) according to the [diagram](https://drawsql.app/teams/akotronis-team/diagrams/dit170-2)<br><br>
+
+  <p align="center"><img src="./resources/MySQL-Tables.jpg" alt="MySQL-Tables" width="750"/></p>
 
 # Initialization and Tests
 
